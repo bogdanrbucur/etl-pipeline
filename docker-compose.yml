@@ -1,0 +1,90 @@
+services:
+  # MinIO - S3-compatible object storage for our data lake
+  # Web UI: http://localhost:9001 (login: minio/minio123)
+  # S3 API: http://localhost:9000
+  minio:
+    image: minio/minio
+    container_name: minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio      # S3 access key
+      MINIO_ROOT_PASSWORD: minio123  # S3 secret key
+    volumes:
+      - ./minio-data:/data        # Persist data on host machine
+    ports:
+      - "9000:9000"               # S3 API endpoint
+      - "9001:9001"               # Web console
+
+  # Spark Master - distributed computing engine for ETL jobs
+  # Master UI: http://localhost:8080
+  # Spark jobs UI: http://localhost:4040 (when running)
+  spark:
+    image: apache/spark:3.5.0
+    container_name: spark
+    # environment:
+    volumes:
+      - ./jobs:/opt/spark/jobs    # Mount jobs directory
+      - ./data:/opt/spark/data    # Mount data directory for CSV files
+    ports:
+      - "7077:7077"               # Spark master port (for workers to connect)
+      - "8080:8080"               # Spark master web UI
+      - "4040:4040"               # Spark application UI (appears when jobs run)
+    command: >
+      bash -c "
+      wget -q https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.3.4/hadoop-aws-3.3.4.jar -O /opt/spark/jars/hadoop-aws-3.3.4.jar &&
+      wget -q https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/1.11.1034/aws-java-sdk-bundle-1.11.1034.jar -O /opt/spark/jars/aws-java-sdk-bundle-1.11.1034.jar &&
+      export AWS_ACCESS_KEY_ID=minio &&
+      export AWS_SECRET_ACCESS_KEY=minio123 &&
+      /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+      "
+    depends_on:
+      - minio                     # Wait for MinIO to start first
+
+# Spark Worker - executes the actual Spark tasks (scalable)
+  spark-worker:
+    image: apache/spark:3.5.0
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark:7077
+    volumes:
+      - ./data:/opt/spark/data    # Add this line - worker needs access to data too
+    command: >
+      bash -c "
+      wget -q https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.3.4/hadoop-aws-3.3.4.jar -O /opt/spark/jars/hadoop-aws-3.3.4.jar &&
+      wget -q https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/1.11.1034/aws-java-sdk-bundle-1.11.1034.jar -O /opt/spark/jars/aws-java-sdk-bundle-1.11.1034.jar &&
+      export AWS_ACCESS_KEY_ID=minio &&
+      export AWS_SECRET_ACCESS_KEY=minio123 &&
+      /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark:7077
+      "
+    depends_on:
+      - spark
+
+  # Airflow - workflow orchestrator to schedule and manage ETL pipelines
+  # Web UI: http://localhost:8082 (login: admin/admin)
+  airflow:
+    image: apache/airflow:2.7.0-python3.9
+    container_name: airflow
+    environment:
+      AIRFLOW__CORE__EXECUTOR: SequentialExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////tmp/airflow.db
+      AIRFLOW__CORE__LOAD_EXAMPLES: false
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: true
+      _AIRFLOW_DB_MIGRATE: true
+      _AIRFLOW_WWW_USER_CREATE: true
+      _AIRFLOW_WWW_USER_USERNAME: admin
+      _AIRFLOW_WWW_USER_PASSWORD: admin
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+    ports:
+      - "8082:8080"
+    user: "50000:0"  # Fix permission issues
+    command: webserver
+
+# HOW TO USE THIS STACK:
+# 1. Run: docker-compose up
+# 2. MinIO UI: http://localhost:9001 (create buckets, upload data)
+# 3. Spark UI: http://localhost:8080 (monitor cluster)
+# 4. Airflow UI: http://localhost:8082 (create/schedule ETL workflows)
+# 5. Put your DAG files in ./dags/ folder
+# 6. In Spark jobs, access S3 data using: s3a://bucket-name/path/to/file
