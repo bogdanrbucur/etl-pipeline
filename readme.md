@@ -58,7 +58,7 @@ Credentials for MinIO and Airflow are set in the `docker-compose.yml` file.
 
 ## Usage
 
-### Spark jobs
+### Running Spark Jobs manually
 
 1. Create a new Python file (e.g., `csv_to_parquet.py`) in the `/jobs` directory.
 2. Submit the job to Spark using the following command:
@@ -79,7 +79,7 @@ The `./jobs` directory on the host machine is mounted to `/opt/spark/jobs/` in t
 
 The sample job `csv_to_parquet.py` reads CSV files from this directory and writes Parquet files to the MinIO `bronze` bucket.
 
-### Environment Variables
+#### Environment Variables
 
 Note that the Spark submit command includes several environment variables as configuration parameters:
 
@@ -92,6 +92,36 @@ Note that the Spark submit command includes several environment variables as con
 
 These configuration parameters are essential for Spark to connect to the MinIO object storage and must be included in every Spark job submission.
 
+### Running Airflow DAGs (Directed Acyclic Graphs)
+
+1. Create DAG files in the `dags` directory. They must have a `.py` extension.
+2. Access the Airflow web interface at http://localhost:8082
+3. Log in using the credentials specified in the `docker-compose.yml` file (default: username: `admin`, password: `admin`).
+4. Enable and trigger the desired DAGs from the Airflow UI.
+
 ## Architecture
 
-[Add architecture diagram and description here]
+The ETL pipeline consists of several containerized services working together:
+
+### Workflow Overview
+
+1. **Data Ingestion**: Raw CSV data is placed in the `data` directory
+2. **Processing**: Spark jobs transform CSV data to Parquet format
+3. **Storage**: Processed data is stored in MinIO object storage buckets
+4. **Orchestration**: Airflow manages and schedules the ETL workflows
+
+### Container Services
+
+- **Spark Master**: Coordinates Spark cluster operations and job distribution
+- **Spark Worker(s)**: Execute Spark tasks and data processing jobs
+- **MinIO**: S3-compatible object storage for data lake (bronze, silver, gold layers)
+- **Airflow server**: Web interface for managing DAGs and monitoring workflows
+- **Airflow scheduler**: Schedules and triggers DAG runs based on defined intervals or events
+
+### Data Flow
+
+```
+Raw CSV Data → Spark Processing → MinIO Storage → Airflow Orchestration
+```
+
+The pipeline follows a medallion architecture pattern where data flows from bronze (raw) to silver (cleaned) to gold (aggregated) storage layers in MinIO.

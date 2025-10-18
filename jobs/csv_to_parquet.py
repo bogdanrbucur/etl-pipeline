@@ -1,4 +1,6 @@
+from datetime import datetime
 from pyspark.sql import SparkSession
+from pyspark.sql.functions import current_timestamp
 import os
 
 # Create Spark session
@@ -8,7 +10,8 @@ spark = (
     .getOrCreate()
 )
 
-print("Starting CSV to Parquet conversion...")
+current_time = datetime.now()
+print(f"🚀 Starting CSV to Parquet conversion at {current_time}")
 
 # Container directory containing CSV files (mapped from host in docker-compose.yml)
 data_dir = "/opt/spark/data"
@@ -34,16 +37,22 @@ for csv_file in csv_files:
         .csv(f"{data_dir}/{csv_file}")
     )
 
-    print(f"Loaded {df.count()} rows from {csv_file}")
-    print("Schema:")
-    df.printSchema()
+      # Add a processing timestamp to prove it's a fresh run
+    df_with_timestamp = df.withColumn("etl_processed_at", current_timestamp())
+
+
+    print(f"Loaded {df_with_timestamp.count()} rows from {csv_file}")
+    print("Schema with timestamp:")
+    df_with_timestamp.printSchema()
 
     # Create parquet filename (replace .csv with .parquet)
     parquet_filename = csv_file.replace(".csv", ".parquet")
 
     # Write to MinIO as Parquet
     print(f"Writing to MinIO as {parquet_filename}...")
-    df.write.mode("overwrite").parquet(f"s3a://bronze/{parquet_filename}")
+    df_with_timestamp.write.mode("overwrite").parquet(
+        f"s3a://bronze/{parquet_filename}"
+    )
 
     print(f"✅ Successfully converted {csv_file} to {parquet_filename}")
 

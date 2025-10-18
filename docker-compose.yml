@@ -5,6 +5,7 @@ services:
   minio:
     image: minio/minio
     container_name: minio
+    restart: unless-stopped # Automatically restart MinIO if it crashes
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minio      # S3 access key
@@ -14,6 +15,11 @@ services:
     ports:
       - "9000:9000"               # S3 API endpoint
       - "9001:9001"               # Web console
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
 
   # Spark Master - distributed computing engine for ETL jobs
   # Master UI: http://localhost:8080
@@ -21,6 +27,7 @@ services:
   spark:
     image: apache/spark:3.5.0
     container_name: spark
+    restart: unless-stopped # Automatically restart Spark if it crashes
     # environment:
     volumes:
       - ./jobs:/opt/spark/jobs    # Mount jobs directory
@@ -39,10 +46,16 @@ services:
       "
     depends_on:
       - minio                     # Wait for MinIO to start first
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 # Spark Worker - executes the actual Spark tasks (scalable)
   spark-worker:
     image: apache/spark:3.5.0
+    restart: unless-stopped # Automatically restart Spark worker if it crashes
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark:7077
@@ -57,29 +70,79 @@ services:
       /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark:7077
       "
     depends_on:
-      - spark
+      spark:
+        condition: service_healthy
 
-  # Airflow - workflow orchestrator to schedule and manage ETL pipelines
+   # Airflow Webserver - Web UI for managing workflows
   # Web UI: http://localhost:8082 (login: admin/admin)
-  airflow:
+  airflow-webserver:
     image: apache/airflow:2.7.0-python3.9
-    container_name: airflow
+    container_name: airflow-webserver
+    restart: unless-stopped
     environment:
       AIRFLOW__CORE__EXECUTOR: SequentialExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////tmp/airflow.db
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/airflow.db
       AIRFLOW__CORE__LOAD_EXAMPLES: false
       AIRFLOW__WEBSERVER__EXPOSE_CONFIG: true
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL: 10
       _AIRFLOW_DB_MIGRATE: true
       _AIRFLOW_WWW_USER_CREATE: true
       _AIRFLOW_WWW_USER_USERNAME: admin
       _AIRFLOW_WWW_USER_PASSWORD: admin
+    volumes: &airflow-common-volumes
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./airflow-data:/opt/airflow
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "8082:8080"
+    user: "50000:0"
+    command: >
+      bash -c "
+      pip install --user apache-airflow-providers-docker requests &&
+      airflow db migrate &&
+      airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email bogdanrbucur@gmail.com || true &&
+      airflow webserver
+      "
+    depends_on:
+      spark:
+        condition: service_healthy
+
+  # Airflow Scheduler - Executes tasks and manages workflow scheduling
+  airflow-scheduler:
+    image: apache/airflow:2.7.0-python3.9
+    container_name: airflow-scheduler
+    restart: unless-stopped
+    environment:
+      AIRFLOW__CORE__EXECUTOR: SequentialExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/airflow.db
+      AIRFLOW__CORE__LOAD_EXAMPLES: false
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: true
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL: 10
+      _AIRFLOW_WWW_USER_USERNAME: admin
+      _AIRFLOW_WWW_USER_PASSWORD: admin
+      _AIRFLOW_DB_MIGRATE: false
+      _AIRFLOW_WWW_USER_CREATE: false
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
-    ports:
-      - "8082:8080"
-    user: "50000:0"  # Fix permission issues
-    command: webserver
+      - ./airflow-data:/opt/airflow
+      - /var/run/docker.sock:/var/run/docker.sock
+    user: "50000:0"
+    command: >
+      bash -c "
+      pip install --user apache-airflow-providers-docker requests &&
+      airflow scheduler
+      "
+    depends_on:
+      - airflow-webserver
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "airflow scheduler"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 # HOW TO USE THIS STACK:
 # 1. Run: docker-compose up
