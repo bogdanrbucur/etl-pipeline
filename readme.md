@@ -1,6 +1,6 @@
 # ETL Pipeline
 
-This project implements an ETL (Extract, Transform, Load) pipeline using Apache Spark, Docker, and Airflow. The pipeline ingests CSV data, processes it with Spark, and stores the results in a MinIO object storage.
+This project implements an ETL pipeline using Apache Spark, Docker, and Airflow. The pipeline ingests CSV data, processes it with Spark, and stores the results in a MinIO object storage.
 
 The Spark jobs are orchestrated using Apache Airflow, and the processed data can be queried using DuckDB in a Jupyter Notebook.
 
