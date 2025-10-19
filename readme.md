@@ -2,6 +2,8 @@
 
 This project implements an ETL (Extract, Transform, Load) pipeline using Apache Spark, Docker, and Airflow. The pipeline ingests CSV data, processes it with Spark, and stores the results in a MinIO object storage.
 
+The Spark jobs are orchestrated using Apache Airflow, and the processed data can be queried using DuckDB in a Jupyter Notebook.
+
 ## Prerequisites
 
 ### Environment Variables Setup
@@ -12,9 +14,6 @@ This project implements an ETL (Extract, Transform, Load) pipeline using Apache 
    ```
 
 2. **Edit `.env` file** with your own credentials
-
-> **⚠️ Important**: Never commit the `.env` file to version control! It's already in `.gitignore`.
-
 
 ### Data Download
 
@@ -30,13 +29,13 @@ and place the `yellow_tripdata_2015-01.csv` file in the `data` directory.
   docker compose up
   ```
 
-To stop the services, run:
+To stop the services:
 
   ```bash
   docker compose down
   ```
 
-To start with 3 workers, run:
+To start with 3 workers:
 
   ```bash
   docker compose up --scale spark-worker=3
@@ -54,8 +53,6 @@ Once the containers are running, access the following interfaces:
 - **Apache Airflow**: http://localhost:8082
   - Username: *from .env file* (`AIRFLOW_ADMIN_USERNAME`)
   - Password: *from .env file* (`AIRFLOW_ADMIN_PASSWORD`)
-
-Credentials for MinIO and Airflow are set in the `docker-compose.yml` file.
 
 ## Initial Configuration
 
@@ -101,8 +98,8 @@ The included job `csv_to_parquet.py` reads CSV files from this directory and wri
 
 Run the `view_silver_data.ipynb` notebook in your local Jupyter environment. DuckDB will be installed via pip if not already present.
 
-[!Note]
-In S3 a folder is created with a .parquet extension because Parquet files are typically stored as a collection of files within a directory structure. When Spark writes Parquet files to S3 (or S3-compatible storage like MinIO), it creates a directory for each dataset, and within that directory, it stores multiple Parquet files. This is done to optimize performance and allow for parallel processing of the data. When the data is read back, database systems treat the entire directory as a single Parquet dataset.
+>[!NOTE]
+>In S3 a folder is created with a .parquet extension because Parquet files are typically stored as a collection of files within a directory structure. When Spark writes Parquet files to S3 (or S3-compatible storage like MinIO), it creates a directory for each dataset, and within that directory, it stores multiple Parquet files. This is done to optimize performance and allow for parallel processing of the data. When the data is read back, database systems treat the entire directory as a single Parquet dataset.
 
 #### Environment Variables
 
