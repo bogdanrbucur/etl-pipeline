@@ -1,5 +1,7 @@
 # ETL Pipeline
 
+This project implements an ETL (Extract, Transform, Load) pipeline using Apache Spark, Docker, and Airflow. The pipeline ingests CSV data, processes it with Spark, and stores the results in a MinIO object storage.
+
 ## Prerequisites
 
 ### Data Download
@@ -77,7 +79,21 @@ The `./data` directory is mounted to `/opt/spark/data` in the Spark container, s
 
 The `./jobs` directory on the host machine is mounted to `/opt/spark/jobs/` in the container.
 
-The sample job `csv_to_parquet.py` reads CSV files from this directory and writes Parquet files to the MinIO `bronze` bucket.
+The included job `csv_to_parquet.py` reads CSV files from this directory and writes Parquet files to the MinIO `bronze` bucket.
+
+### Using Airflow to Orchestrate Jobs
+
+1. Create DAG files in the `dags` directory. They must have a `.py` extension.
+2. Access the Airflow web interface at http://localhost:8082
+3. Log in using the credentials specified in the `docker-compose.yml` file (default: username: `admin`, password: `admin`).
+4. Enable and trigger the desired DAGs from the Airflow UI.
+
+### Viewing the processed data in Juypyter Notebook with DuckDB
+
+Run the `view_silver_data.ipynb` notebook in your local Jupyter environment. Make sure to install DuckDB first:
+
+[!Note]
+In S3 a folder is created with a .parquet extension because Parquet files are typically stored as a collection of files within a directory structure. When Spark writes Parquet files to S3 (or S3-compatible storage like MinIO), it creates a directory for each dataset, and within that directory, it stores multiple Parquet files. This is done to optimize performance and allow for parallel processing of the data. When the data is read back, database systems treat the entire directory as a single Parquet dataset.
 
 #### Environment Variables
 

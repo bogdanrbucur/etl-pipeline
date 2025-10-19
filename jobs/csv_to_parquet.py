@@ -45,8 +45,8 @@ for csv_file in csv_files:
     print("Schema with timestamp:")
     df_with_timestamp.printSchema()
 
-    # Create parquet filename (replace .csv with .parquet)
-    parquet_filename = csv_file.replace(".csv", ".parquet")
+    # Create parquet filename (taxi_data)
+    parquet_filename = "taxi_data.parquet"
 
     # Write to MinIO as Parquet
     print(f"Writing to MinIO as {parquet_filename}...")

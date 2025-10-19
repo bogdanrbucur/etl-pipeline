@@ -149,5 +149,5 @@ services:
 # 2. MinIO UI: http://localhost:9001 (create buckets, upload data)
 # 3. Spark UI: http://localhost:8080 (monitor cluster)
 # 4. Airflow UI: http://localhost:8082 (create/schedule ETL workflows)
-# 5. Put your DAG files in ./dags/ folder
+# 5. Put your DAG files in ./dags/ folder - they'll sync automatically
 # 6. In Spark jobs, access S3 data using: s3a://bucket-name/path/to/file
