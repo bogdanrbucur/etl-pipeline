@@ -4,6 +4,8 @@ This project implements an ETL pipeline using Apache Spark, Docker, and Airflow.
 
 The Spark jobs are orchestrated using Apache Airflow, and the processed data can be queried using DuckDB in a Jupyter Notebook.
 
+It uses NYC Yellow Taxi Trip Data as a sample dataset to demonstrate the ETL process but can be adapted to any CSV data source by changing the Spark job logic.
+
 ## Prerequisites
 
 ### Environment Variables Setup
