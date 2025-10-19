@@ -3,6 +3,11 @@ from airflow import DAG
 from airflow.operators.bash import BashOperator  # Changed from DockerOperator
 from airflow.operators.python import PythonOperator
 import requests
+import os
+
+# Retrieve the MinIO credentials from environment variables
+MINIO_ROOT_USER = os.getenv('MINIO_ROOT_USER')
+MINIO_ROOT_PASSWORD = os.getenv('MINIO_ROOT_PASSWORD')
 
 # Default arguments for the DAG
 default_args = {
@@ -78,12 +83,12 @@ check_minio_task = PythonOperator(
 # Task 3: Run Spark ETL job using the existing Spark container (with S3A JARs)
 spark_etl_task = BashOperator(
     task_id="csv_to_parquet_spark_job",
-    bash_command="""
+    bash_command=f"""
     docker exec spark /opt/spark/bin/spark-submit \
       --master spark://spark:7077 \
       --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000 \
-      --conf spark.hadoop.fs.s3a.access.key=minio \
-      --conf spark.hadoop.fs.s3a.secret.key=minio123 \
+      --conf spark.hadoop.fs.s3a.access.key={MINIO_ROOT_USER} \
+      --conf spark.hadoop.fs.s3a.secret.key={MINIO_ROOT_PASSWORD} \
       --conf spark.hadoop.fs.s3a.path.style.access=true \
       --conf spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem \
       --conf spark.hadoop.fs.s3a.connection.ssl.enabled=false \

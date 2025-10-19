@@ -3,70 +3,66 @@ import json
 from botocore.exceptions import ClientError
 
 # AWS Secrets Manager constants
-AWS_REGION = 'us-east-1'
-MINIO_SECRET_NAME = 'etl-pipeline/minio'
-AIRFLOW_SECRET_NAME = 'etl-pipeline/airflow'
+AWS_REGION = "us-east-1"
+MINIO_SECRET_NAME = "etl-pipeline/minio"
+AIRFLOW_SECRET_NAME = "etl-pipeline/airflow"
 # Add/remove as needed to manage other secrets
+
 
 class SecretsManager:
     """Helper class to retrieve secrets from AWS Secrets Manager"""
-    
+
     def __init__(self, region_name=AWS_REGION):
-        self.client = boto3.client('secretsmanager', region_name=region_name)
-    
+        self.client = boto3.client("secretsmanager", region_name=region_name)
+
     def get_secret(self, secret_name):
         """
         Retrieve a secret from AWS Secrets Manager
-        
+
         Args:
             secret_name: Name of the secret to retrieve
-            
+
         Returns:
             dict: Secret values as dictionary
         """
         try:
             response = self.client.get_secret_value(SecretId=secret_name)
-            
-            if 'SecretString' in response:
-                return json.loads(response['SecretString'])
+
+            if "SecretString" in response:
+                return json.loads(response["SecretString"])
             else:
                 raise ValueError(f"Secret {secret_name} has no SecretString")
-                
+
         except ClientError as e:
-            error_code = e.response['Error']['Code']
-            if error_code == 'ResourceNotFoundException':
+            error_code = e.response["Error"]["Code"]
+            if error_code == "ResourceNotFoundException":
                 raise ValueError(f"Secret {secret_name} not found")
-            elif error_code == 'InvalidRequestException':
+            elif error_code == "InvalidRequestException":
                 raise ValueError(f"Invalid request for secret {secret_name}")
-            elif error_code == 'InvalidParameterException':
+            elif error_code == "InvalidParameterException":
                 raise ValueError(f"Invalid parameter for secret {secret_name}")
             else:
                 raise e
-    
+
     def get_minio_credentials(self):
         """Get MinIO credentials"""
         secret = self.get_secret(MINIO_SECRET_NAME)
-        return {
-            'username': secret['username'],
-            'password': secret['password']
-        }
-    
+        return {"username": secret["username"], "password": secret["password"]}
+
     def get_airflow_credentials(self):
         """Get Airflow credentials"""
         secret = self.get_secret(AIRFLOW_SECRET_NAME)
-        return {
-            'username': secret['username'],
-            'password': secret['password']
-        }
+        return {"username": secret["username"], "password": secret["password"]}
+
 
 # Example usage
-if __name__ == '__main__':
+if __name__ == "__main__":
     sm = SecretsManager()
-    
+
     # Test retrieval
     minio_creds = sm.get_minio_credentials()
     print(f"✅ MinIO username: {minio_creds['username']}")
-    
+
     airflow_creds = sm.get_airflow_credentials()
     print(f"✅ Airflow username: {airflow_creds['username']}")
 

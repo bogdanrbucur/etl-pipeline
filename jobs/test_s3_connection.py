@@ -1,12 +1,17 @@
 from pyspark.sql import SparkSession
+import os
+
+# Retrieve the MinIO credentials from environment variables (in .env or set by Secrets Manager)
+MINIO_ROOT_USER = os.getenv('MINIO_ROOT_USER')
+MINIO_ROOT_PASSWORD = os.getenv('MINIO_ROOT_PASSWORD')
 
 # Configure Spark to disable problematic S3A features
 spark = (
     SparkSession.builder.appName("Test S3 Write")
     .master("spark://spark:7077")
     .config("spark.hadoop.fs.s3a.endpoint", "http://minio:9000")
-    .config("spark.hadoop.fs.s3a.access.key", "minio")
-    .config("spark.hadoop.fs.s3a.secret.key", "minio123")
+    .config("spark.hadoop.fs.s3a.access.key", MINIO_ROOT_USER)
+    .config("spark.hadoop.fs.s3a.secret.key", MINIO_ROOT_PASSWORD)
     .config("spark.hadoop.fs.s3a.path.style.access", "true")
     .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
     .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
