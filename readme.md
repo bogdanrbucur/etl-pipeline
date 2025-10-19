@@ -4,20 +4,22 @@ This project implements an ETL (Extract, Transform, Load) pipeline using Apache 
 
 ## Prerequisites
 
+### Environment Variables Setup
+
+1. **Rename the environment template**:
+   ```bash
+   cp .env.template .env
+   ```
+
+2. **Edit `.env` file** with your own credentials
+
+> **⚠️ Important**: Never commit the `.env` file to version control! It's already in `.gitignore`.
+
+
 ### Data Download
 
 Download the NYC Yellow Taxi Trip Data CSV from (Kaggle)[https://www.kaggle.com/datasets/elemento/nyc-yellow-taxi-trip-data/data] 
 and place the `yellow_tripdata_2015-01.csv` file in the `data` directory.
-
-### Create Required Directories
-
-Create the following directories if they do not exist:
-
-```bash
-mkdir -p data
-mkdir -p logs
-mkdir -p minio-data
-```
 
 ### Docker Setup
 
@@ -44,10 +46,14 @@ To start with 3 workers, run:
 
 Once the containers are running, access the following interfaces:
 
-- **MinIO Console**: http://localhost:9001 (username: `minio`, password: `minio123`)
+- **MinIO Console**: http://localhost:9001
+  - Username: *from .env file* (`MINIO_ROOT_USER`)
+  - Password: *from .env file* (`MINIO_ROOT_PASSWORD`)
 - **Apache Spark**: http://localhost:8080  - Spark Master UI
 - **Apache Spark**: http://localhost:4040/jobs/  - Spark Job UI
-- **Apache Airflow**: http://localhost:8082 (username: `admin`, password: `admin`)
+- **Apache Airflow**: http://localhost:8082
+  - Username: *from .env file* (`AIRFLOW_ADMIN_USERNAME`)
+  - Password: *from .env file* (`AIRFLOW_ADMIN_PASSWORD`)
 
 Credentials for MinIO and Airflow are set in the `docker-compose.yml` file.
 
@@ -56,11 +62,14 @@ Credentials for MinIO and Airflow are set in the `docker-compose.yml` file.
 ### MinIO Setup
 
 1. Access the MinIO console
-2. Create a new bucket named `bronze`
+2. Log in with credentials from your `.env` file
+3. Create a new bucket named `bronze`
 
 ## Usage
 
 ### Running Spark Jobs manually
+
+> **Note**: Credentials are automatically loaded from environment variables.
 
 1. Create a new Python file (e.g., `csv_to_parquet.py`) in the `/jobs` directory.
 2. Submit the job to Spark using the following command:
@@ -68,8 +77,8 @@ Credentials for MinIO and Airflow are set in the `docker-compose.yml` file.
    docker exec spark /opt/spark/bin/spark-submit \
      --master spark://spark:7077 \
      --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000 \
-     --conf spark.hadoop.fs.s3a.access.key=minio \
-     --conf spark.hadoop.fs.s3a.secret.key=minio123 \
+     --conf spark.hadoop.fs.s3a.access.key==${MINIO_ROOT_USER} \
+     --conf spark.hadoop.fs.s3a.secret.key=${MINIO_ROOT_PASSWORD} \
      --conf spark.hadoop.fs.s3a.path.style.access=true \
      --conf spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem \
      --conf spark.hadoop.fs.s3a.connection.ssl.enabled=false \
@@ -85,12 +94,12 @@ The included job `csv_to_parquet.py` reads CSV files from this directory and wri
 
 1. Create DAG files in the `dags` directory. They must have a `.py` extension.
 2. Access the Airflow web interface at http://localhost:8082
-3. Log in using the credentials specified in the `docker-compose.yml` file (default: username: `admin`, password: `admin`).
+3. Log in using credentials from your `.env` file
 4. Enable and trigger the desired DAGs from the Airflow UI.
 
 ### Viewing the processed data in Juypyter Notebook with DuckDB
 
-Run the `view_silver_data.ipynb` notebook in your local Jupyter environment. Make sure to install DuckDB first:
+Run the `view_silver_data.ipynb` notebook in your local Jupyter environment. DuckDB will be installed via pip if not already present.
 
 [!Note]
 In S3 a folder is created with a .parquet extension because Parquet files are typically stored as a collection of files within a directory structure. When Spark writes Parquet files to S3 (or S3-compatible storage like MinIO), it creates a directory for each dataset, and within that directory, it stores multiple Parquet files. This is done to optimize performance and allow for parallel processing of the data. When the data is read back, database systems treat the entire directory as a single Parquet dataset.
@@ -108,6 +117,14 @@ Note that the Spark submit command includes several environment variables as con
 
 These configuration parameters are essential for Spark to connect to the MinIO object storage and must be included in every Spark job submission.
 
+### Secrets Management
+
+.env file is used to manage sensitive information such as access keys and passwords. Ensure that this file is kept secure and not committed to version control. This is only suitable for local development and testing.
+
+For production environments, consider using a dedicated secrets management tool or service to handle sensitive credentials.
+
+The `create_AWS_secrets.sh` script can be used to create secrets in AWS Secrets Manager for MinIO and Airflow credentials. The `aws_secrets_manager_retrieve.py` module provides a helper class to retrieve these secrets programmatically in Python scripts for Spark jobs or Airflow DAGs.
+
 ### Running Airflow DAGs (Directed Acyclic Graphs)
 
 1. Create DAG files in the `dags` directory. They must have a `.py` extension.
@@ -124,7 +141,8 @@ The ETL pipeline consists of several containerized services working together:
 1. **Data Ingestion**: Raw CSV data is placed in the `data` directory
 2. **Processing**: Spark jobs transform CSV data to Parquet format
 3. **Storage**: Processed data is stored in MinIO object storage buckets
-4. **Orchestration**: Airflow manages and schedules the ETL workflows
+4. **Querying**: DuckDB queries Parquet files directly from MinIO
+5. **Orchestration**: Airflow manages and schedules the ETL workflows
 
 ### Container Services
 
@@ -137,7 +155,7 @@ The ETL pipeline consists of several containerized services working together:
 ### Data Flow
 
 ```
-Raw CSV Data → Spark Processing → MinIO Storage → Airflow Orchestration
+Raw CSV Data → Spark Processing → MinIO Storage → DuckDB Queries
+              ↑
+    Orchestrated by Airflow
 ```
-
-The pipeline follows a medallion architecture pattern where data flows from bronze (raw) to silver (cleaned) to gold (aggregated) storage layers in MinIO.

@@ -4,3 +4,6 @@
 /minio-data/*
 /dags/__pycache__/
 /airflow-data/*
+
+# Secrets
+.env

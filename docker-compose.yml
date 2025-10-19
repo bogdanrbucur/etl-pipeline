@@ -8,8 +8,8 @@ services:
     restart: unless-stopped # Automatically restart MinIO if it crashes
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: minio      # S3 access key
-      MINIO_ROOT_PASSWORD: minio123  # S3 secret key
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}      # S3 access key from .env file
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}  # S3 secret key from .env file
     volumes:
       - ./minio-data:/data        # Persist data on host machine
     ports:
@@ -40,8 +40,8 @@ services:
       bash -c "
       wget -q https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.3.4/hadoop-aws-3.3.4.jar -O /opt/spark/jars/hadoop-aws-3.3.4.jar &&
       wget -q https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/1.11.1034/aws-java-sdk-bundle-1.11.1034.jar -O /opt/spark/jars/aws-java-sdk-bundle-1.11.1034.jar &&
-      export AWS_ACCESS_KEY_ID=minio &&
-      export AWS_SECRET_ACCESS_KEY=minio123 &&
+      export AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER} &&
+      export AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD} &&
       /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
       "
     depends_on:
@@ -65,8 +65,8 @@ services:
       bash -c "
       wget -q https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.3.4/hadoop-aws-3.3.4.jar -O /opt/spark/jars/hadoop-aws-3.3.4.jar &&
       wget -q https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/1.11.1034/aws-java-sdk-bundle-1.11.1034.jar -O /opt/spark/jars/aws-java-sdk-bundle-1.11.1034.jar &&
-      export AWS_ACCESS_KEY_ID=minio &&
-      export AWS_SECRET_ACCESS_KEY=minio123 &&
+      export AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER} &&
+      export AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD} &&
       /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark:7077
       "
     depends_on:
@@ -88,8 +88,8 @@ services:
       AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL: 10
       _AIRFLOW_DB_MIGRATE: true
       _AIRFLOW_WWW_USER_CREATE: true
-      _AIRFLOW_WWW_USER_USERNAME: admin
-      _AIRFLOW_WWW_USER_PASSWORD: admin
+      _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_ADMIN_USERNAME}
+      _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD}
     volumes: &airflow-common-volumes
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
@@ -102,7 +102,7 @@ services:
       bash -c "
       pip install --user apache-airflow-providers-docker requests &&
       airflow db migrate &&
-      airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email bogdanrbucur@gmail.com || true &&
+      airflow users create --username ${AIRFLOW_ADMIN_USERNAME} --password ${AIRFLOW_ADMIN_PASSWORD} --firstname ${AIRFLOW_USER_FIRSTNAME} --lastname ${AIRFLOW_USER_LASTNAME} --role Admin --email ${AIRFLOW_USER_EMAIL} || true &&
       airflow webserver
       "
     depends_on:
@@ -121,8 +121,8 @@ services:
       AIRFLOW__WEBSERVER__EXPOSE_CONFIG: true
       AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
       AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL: 10
-      _AIRFLOW_WWW_USER_USERNAME: admin
-      _AIRFLOW_WWW_USER_PASSWORD: admin
+      _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_ADMIN_USERNAME}
+      _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD}
       _AIRFLOW_DB_MIGRATE: false
       _AIRFLOW_WWW_USER_CREATE: false
     volumes:
