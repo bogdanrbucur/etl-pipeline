@@ -17,7 +17,7 @@ The Spark jobs are orchestrated using Apache Airflow, and the processed data can
 
 ### Data Download
 
-Download the NYC Yellow Taxi Trip Data CSV from (Kaggle)[https://www.kaggle.com/datasets/elemento/nyc-yellow-taxi-trip-data/data] 
+Download the NYC Yellow Taxi Trip Data CSV from [Kaggle](https://www.kaggle.com/datasets/elemento/nyc-yellow-taxi-trip-data/data) 
 and place the `yellow_tripdata_2015-01.csv` file in the `data` directory.
 
 ### Docker Setup
@@ -99,7 +99,7 @@ The included job `csv_to_parquet.py` reads CSV files from this directory and wri
 Run the `view_silver_data.ipynb` notebook in your local Jupyter environment. DuckDB will be installed via pip if not already present.
 
 >[!NOTE]
->In S3 a folder is created with a .parquet extension because Parquet files are typically stored as a collection of files within a directory structure. When Spark writes Parquet files to S3 (or S3-compatible storage like MinIO), it creates a directory for each dataset, and within that directory, it stores multiple Parquet files. This is done to optimize performance and allow for parallel processing of the data. When the data is read back, database systems treat the entire directory as a single Parquet dataset.
+>In S3 a folder is created with a `.parquet` extension because Parquet files are typically stored as a collection of files within a directory structure. When Spark writes Parquet files to S3 (or S3-compatible storage like MinIO), it creates a directory for each dataset, and within that directory, it stores multiple Parquet files. This is done to optimize performance and allow for parallel processing of the data. When the data is read back, database systems treat the entire directory as a single Parquet dataset.
 
 #### Environment Variables
 
@@ -116,7 +116,7 @@ These configuration parameters are essential for Spark to connect to the MinIO o
 
 ### Secrets Management
 
-.env file is used to manage sensitive information such as access keys and passwords. Ensure that this file is kept secure and not committed to version control. This is only suitable for local development and testing.
+The `.env` file is used to manage sensitive information such as access keys and passwords. Ensure that this file is kept secure and not committed to version control. This is only suitable for local development and testing.
 
 For production environments, consider using a dedicated secrets management tool or service to handle sensitive credentials.
 
@@ -153,6 +153,6 @@ The ETL pipeline consists of several containerized services working together:
 
 ```
 Raw CSV Data → Spark Processing → MinIO Storage → DuckDB Queries
-              ↑
-    Orchestrated by Airflow
+             ↑
+  Orchestrated by Airflow
 ```
