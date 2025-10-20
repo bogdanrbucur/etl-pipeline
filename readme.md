@@ -62,7 +62,7 @@ Once the containers are running, access the following interfaces:
 
 1. Access the MinIO console
 2. Log in with credentials from your `.env` file
-3. Create a new bucket named `bronze`
+3. Create a new bucket named `bronze` and one named `silver`
 
 ## Usage
 
@@ -76,7 +76,7 @@ Once the containers are running, access the following interfaces:
    docker exec spark /opt/spark/bin/spark-submit \
      --master spark://spark:7077 \
      --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000 \
-     --conf spark.hadoop.fs.s3a.access.key==${MINIO_ROOT_USER} \
+     --conf spark.hadoop.fs.s3a.access.key=${MINIO_ROOT_USER} \
      --conf spark.hadoop.fs.s3a.secret.key=${MINIO_ROOT_PASSWORD} \
      --conf spark.hadoop.fs.s3a.path.style.access=true \
      --conf spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem \
@@ -89,11 +89,11 @@ The `./jobs` directory on the host machine is mounted to `/opt/spark/jobs/` in t
 
 The included job `csv_to_parquet.py` reads CSV files from this directory and writes Parquet files to the MinIO `bronze` bucket.
 
-### Using Airflow to Orchestrate Jobs
+### Running Airflow DAGs (Directed Acyclic Graphs)
 
 1. Create DAG files in the `dags` directory. They must have a `.py` extension.
 2. Access the Airflow web interface at http://localhost:8082
-3. Log in using credentials from your `.env` file
+3. Log in using the credentials specified in the `.env` file
 4. Enable and trigger the desired DAGs from the Airflow UI.
 
 ### Viewing the processed data in Juypyter Notebook with DuckDB
@@ -102,17 +102,6 @@ Run the `view_silver_data.ipynb` notebook in your local Jupyter environment. Duc
 
 >[!NOTE]
 >In S3 a folder is created with a `.parquet` extension because Parquet files are typically stored as a collection of files within a directory structure. When Spark writes Parquet files to S3 (or S3-compatible storage like MinIO), it creates a directory for each dataset, and within that directory, it stores multiple Parquet files. This is done to optimize performance and allow for parallel processing of the data. When the data is read back, database systems treat the entire directory as a single Parquet dataset.
-
-#### Environment Variables
-
-Note that the Spark submit command includes several environment variables as configuration parameters:
-
-- `spark.hadoop.fs.s3a.endpoint` - MinIO endpoint URL
-- `spark.hadoop.fs.s3a.access.key` - MinIO access key
-- `spark.hadoop.fs.s3a.secret.key` - MinIO secret key
-- `spark.hadoop.fs.s3a.path.style.access` - Required for MinIO compatibility
-- `spark.hadoop.fs.s3a.impl` - S3A filesystem implementation
-- `spark.hadoop.fs.s3a.connection.ssl.enabled` - Disable SSL for local development
 
 These configuration parameters are essential for Spark to connect to the MinIO object storage and must be included in every Spark job submission.
 
@@ -123,13 +112,6 @@ The `.env` file is used to manage sensitive information such as access keys and 
 For production environments, consider using a dedicated secrets management tool or service to handle sensitive credentials.
 
 The `create_AWS_secrets.sh` script can be used to create secrets in AWS Secrets Manager for MinIO and Airflow credentials. The `aws_secrets_manager_retrieve.py` module provides a helper class to retrieve these secrets programmatically in Python scripts for Spark jobs or Airflow DAGs.
-
-### Running Airflow DAGs (Directed Acyclic Graphs)
-
-1. Create DAG files in the `dags` directory. They must have a `.py` extension.
-2. Access the Airflow web interface at http://localhost:8082
-3. Log in using the credentials specified in the `docker-compose.yml` file (default: username: `admin`, password: `admin`).
-4. Enable and trigger the desired DAGs from the Airflow UI.
 
 ## Architecture
 
