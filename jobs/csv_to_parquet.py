@@ -6,7 +6,6 @@ import os
 # Create Spark session
 spark = (
     SparkSession.builder.appName("CSV to Parquet ETL")
-    .master("spark://spark:7077")
     .getOrCreate()
 )
 

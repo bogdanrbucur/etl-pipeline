@@ -32,6 +32,7 @@ services:
     volumes:
       - ./jobs:/opt/spark/jobs    # Mount jobs directory
       - ./data:/opt/spark/data    # Mount data directory for CSV files
+      # - ./logs:/logs              # Mount logs directory - used to output row count
     ports:
       - "7077:7077"               # Spark master port (for workers to connect)
       - "8080:8080"               # Spark master web UI
@@ -61,6 +62,7 @@ services:
       - SPARK_MASTER_URL=spark://spark:7077
     volumes:
       - ./data:/opt/spark/data    # Add this line - worker needs access to data too
+      # - ./logs:/logs              # Mount logs directory - used to output row count
     command: >
       bash -c "
       wget -q https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.3.4/hadoop-aws-3.3.4.jar -O /opt/spark/jars/hadoop-aws-3.3.4.jar &&

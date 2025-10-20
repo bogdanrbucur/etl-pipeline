@@ -8,6 +8,8 @@ import os
 # Retrieve the MinIO credentials from environment variables
 MINIO_ROOT_USER = os.getenv("MINIO_ROOT_USER")
 MINIO_ROOT_PASSWORD = os.getenv("MINIO_ROOT_PASSWORD")
+S3_ENDPOINT = "http://minio:9000"
+SPARK_ENDPOINT = "spark://spark:7077"
 
 # Parquet filename
 parquet_file = "taxi_data.parquet"
@@ -58,7 +60,7 @@ def check_spark_cluster():
 def check_minio_connection():
     """Check if MinIO is accessible"""
     try:
-        response = requests.get("http://minio:9000/minio/health/live", timeout=10)
+        response = requests.get(f"{S3_ENDPOINT}/minio/health/live", timeout=10)
         if response.status_code == 200:
             print("✅ MinIO is healthy")
             return True
@@ -68,6 +70,14 @@ def check_minio_connection():
         print(f"❌ MinIO connection check failed: {e}")
         raise
 
+# PythonOperator to compare counts
+def compare_counts():
+    with open("/opt/airflow/logs/bronze_count.txt") as f1, open("/opt/airflow/logs/silver_count.txt") as f2:
+        bronze = int(f1.read().strip())
+        silver = int(f2.read().strip())
+    if bronze != silver:
+        raise ValueError(f"Row count mismatch! Bronze: {bronze}, Silver: {silver}")
+    print(f"✅ Row counts match: {bronze}")
 
 # Task 1: Check Spark cluster health
 check_spark_task = PythonOperator(
@@ -88,8 +98,8 @@ spark_convert_task = BashOperator(
     task_id="csv_to_parquet_spark_job",
     bash_command=f"""
     docker exec spark /opt/spark/bin/spark-submit \
-      --master spark://spark:7077 \
-      --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000 \
+      --master {SPARK_ENDPOINT} \
+      --conf spark.hadoop.fs.s3a.endpoint={S3_ENDPOINT} \
       --conf spark.hadoop.fs.s3a.access.key={MINIO_ROOT_USER} \
       --conf spark.hadoop.fs.s3a.secret.key={MINIO_ROOT_PASSWORD} \
       --conf spark.hadoop.fs.s3a.path.style.access=true \
@@ -100,13 +110,32 @@ spark_convert_task = BashOperator(
     dag=dag,
 )
 
+# Task 4: Count rows in the Bronze Parquet file
+count_bronze_rows_task = BashOperator(
+    task_id="count_bronze_rows",
+    bash_command=f"""
+    docker exec spark /opt/spark/bin/spark-submit \
+        --master {SPARK_ENDPOINT} \
+        --conf spark.hadoop.fs.s3a.endpoint={S3_ENDPOINT} \
+        --conf spark.hadoop.fs.s3a.access.key={MINIO_ROOT_USER} \
+        --conf spark.hadoop.fs.s3a.secret.key={MINIO_ROOT_PASSWORD} \
+        --conf spark.hadoop.fs.s3a.path.style.access=true \
+        --conf spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem \
+        --conf spark.hadoop.fs.s3a.connection.ssl.enabled=false \
+        /opt/spark/jobs/count_rows.py \
+        s3a://bronze/{parquet_file} > \
+        /opt/airflow/logs/bronze_count.txt
+    """,
+    dag=dag,
+)
+
 # Task 5: Run Spark ETL job using the existing Spark container (with S3A JARs)
 spark_bronze_to_silver_task = BashOperator(
     task_id="bronze_to_silver_spark_job",
     bash_command=f"""
     docker exec spark /opt/spark/bin/spark-submit \
-      --master spark://spark:7077 \
-      --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000 \
+      --master {SPARK_ENDPOINT} \
+      --conf spark.hadoop.fs.s3a.endpoint={S3_ENDPOINT} \
       --conf spark.hadoop.fs.s3a.access.key={MINIO_ROOT_USER} \
       --conf spark.hadoop.fs.s3a.secret.key={MINIO_ROOT_PASSWORD} \
       --conf spark.hadoop.fs.s3a.path.style.access=true \
@@ -117,9 +146,38 @@ spark_bronze_to_silver_task = BashOperator(
     dag=dag,
 )
 
+# Task 6: Count rows in the Silver Parquet file
+count_silver_rows_task = BashOperator(
+    task_id="count_silver_rows",
+    bash_command=f"""
+    docker exec spark /opt/spark/bin/spark-submit \
+        --master {SPARK_ENDPOINT} \
+        --conf spark.hadoop.fs.s3a.endpoint={S3_ENDPOINT} \
+        --conf spark.hadoop.fs.s3a.access.key={MINIO_ROOT_USER} \
+        --conf spark.hadoop.fs.s3a.secret.key={MINIO_ROOT_PASSWORD} \
+        --conf spark.hadoop.fs.s3a.path.style.access=true \
+        --conf spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem \
+        --conf spark.hadoop.fs.s3a.connection.ssl.enabled=false \
+        /opt/spark/jobs/count_rows.py \
+        s3a://silver/{parquet_file} > \
+        /opt/airflow/logs/silver_count.txt
+    """,
+    dag=dag,
+)
+
+# Task 7: Compare the before and after row counts
+compare_counts_task = PythonOperator(
+    task_id="compare_row_counts",
+    python_callable=compare_counts,
+    dag=dag,
+)
+
 # Set task dependencies
 (
     [check_spark_task, check_minio_task]
     >> spark_convert_task
+    >> count_bronze_rows_task
     >> spark_bronze_to_silver_task
+    >> count_silver_rows_task
+    >> compare_counts_task
 )

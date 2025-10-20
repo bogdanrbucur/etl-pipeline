@@ -9,7 +9,6 @@ parquet_filename = "taxi_data.parquet"
 # Create Spark session
 spark = (
     SparkSession.builder.appName("Bronze to Silver")
-    .master("spark://spark:7077")
     .getOrCreate()
 )
 
