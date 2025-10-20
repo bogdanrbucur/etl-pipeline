@@ -37,9 +37,8 @@ for csv_file in csv_files:
         .csv(f"{data_dir}/{csv_file}")
     )
 
-      # Add a processing timestamp to prove it's a fresh run
+    # Add a processing timestamp to prove it's a fresh run
     df_with_timestamp = df.withColumn("etl_processed_at", current_timestamp())
-
 
     print(f"Loaded {df_with_timestamp.count()} rows from {csv_file}")
     print("Schema with timestamp:")

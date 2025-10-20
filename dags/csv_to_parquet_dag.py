@@ -6,8 +6,11 @@ import requests
 import os
 
 # Retrieve the MinIO credentials from environment variables
-MINIO_ROOT_USER = os.getenv('MINIO_ROOT_USER')
-MINIO_ROOT_PASSWORD = os.getenv('MINIO_ROOT_PASSWORD')
+MINIO_ROOT_USER = os.getenv("MINIO_ROOT_USER")
+MINIO_ROOT_PASSWORD = os.getenv("MINIO_ROOT_PASSWORD")
+
+# Parquet filename
+parquet_file = "taxi_data.parquet"
 
 # Default arguments for the DAG
 default_args = {
@@ -81,7 +84,7 @@ check_minio_task = PythonOperator(
 )
 
 # Task 3: Run Spark ETL job using the existing Spark container (with S3A JARs)
-spark_etl_task = BashOperator(
+spark_convert_task = BashOperator(
     task_id="csv_to_parquet_spark_job",
     bash_command=f"""
     docker exec spark /opt/spark/bin/spark-submit \
@@ -97,5 +100,26 @@ spark_etl_task = BashOperator(
     dag=dag,
 )
 
+# Task 5: Run Spark ETL job using the existing Spark container (with S3A JARs)
+spark_bronze_to_silver_task = BashOperator(
+    task_id="bronze_to_silver_spark_job",
+    bash_command=f"""
+    docker exec spark /opt/spark/bin/spark-submit \
+      --master spark://spark:7077 \
+      --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000 \
+      --conf spark.hadoop.fs.s3a.access.key={MINIO_ROOT_USER} \
+      --conf spark.hadoop.fs.s3a.secret.key={MINIO_ROOT_PASSWORD} \
+      --conf spark.hadoop.fs.s3a.path.style.access=true \
+      --conf spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem \
+      --conf spark.hadoop.fs.s3a.connection.ssl.enabled=false \
+      /opt/spark/jobs/bronze_to_silver.py
+    """,
+    dag=dag,
+)
+
 # Set task dependencies
-[check_spark_task, check_minio_task] >> spark_etl_task
+(
+    [check_spark_task, check_minio_task]
+    >> spark_convert_task
+    >> spark_bronze_to_silver_task
+)
