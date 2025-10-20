@@ -6,6 +6,14 @@ The Spark jobs are orchestrated using Apache Airflow, and the processed data can
 
 It uses NYC Yellow Taxi Trip Data as a sample dataset to demonstrate the ETL process but can be adapted to any CSV data source by changing the Spark job logic.
 
+### Data Flow
+
+```
+Raw CSV Data → Spark Processing (CSV -> Parquet; Bronze -> Silver) → MinIO Storage → DuckDB Queries
+             ↑
+  Orchestrated by Airflow
+```
+
 ## Prerequisites
 
 ### Environment Variables Setup
@@ -132,11 +140,3 @@ The ETL pipeline consists of several containerized services working together:
 - **MinIO**: S3-compatible object storage for data lake (bronze, silver, gold layers)
 - **Airflow server**: Web interface for managing DAGs and monitoring workflows
 - **Airflow scheduler**: Schedules and triggers DAG runs based on defined intervals or events
-
-### Data Flow
-
-```
-Raw CSV Data → Spark Processing → MinIO Storage → DuckDB Queries
-             ↑
-  Orchestrated by Airflow
-```
